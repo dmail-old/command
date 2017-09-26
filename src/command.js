@@ -21,20 +21,33 @@
 const treeKill = require("tree-kill")
 const { spawn } = require("child_process")
 const { whenWillTerminate, whenTerminate } = require("./whenProcess.js")
-const { createAbreviator } = require("./abbreviate.js")
+const { createAbbreviator } = require("./abbreviate.js")
 
-const abbreviate = createAbreviator(10)
+const abbreviate = createAbbreviator(10)
 const isWindows = process.platform === "win32"
 const defaultArgs = []
 
 const defaultOnMessage = text => process.stdout.write(text)
 const defaultOnAlarm = text => process.stderr.write(text)
+const defaultWindowsExtension = "cmd"
 
-const createCommand = ({ name, label, args = defaultArgs, cwd = process.cwd() }) => {
+const createCommand = ({
+	name,
+	label,
+	windowsExtension = defaultWindowsExtension,
+	args = defaultArgs,
+	cwd = process.cwd()
+}) => {
+	let commandName
 	if (isWindows) {
-		if (name.endsWith(".exe") === false) {
-			name += ".cmd"
+		const extension = `.${windowsExtension}`
+		if (name.endsWith(extension)) {
+			commandName = name
+		} else {
+			commandName = name + extension
 		}
+	} else {
+		commandName = name
 	}
 
 	const toString = () => `${name} ${args.join(" ")}`
@@ -52,7 +65,7 @@ const createCommand = ({ name, label, args = defaultArgs, cwd = process.cwd() })
 
 		setImmediate(() => {
 			try {
-				const commandProcess = spawn(name, args, { cwd })
+				const commandProcess = spawn(commandName, args, { cwd })
 				onMessage(toString() + "\n") // eslint-disable-line prefer-template
 				execution.process = commandProcess
 				alive = true
@@ -111,7 +124,7 @@ const createAlarmFromError = (command, error) =>
 	prefix(
 		command,
 		`Error while executing:
-${error.stack}`
+${error}`
 	)
 const createMessageFromSuccess = (command, status) => prefix(command, `exited with ${status}`)
 const createAlarmFromFailure = (command, status) => prefix(command, `exited with ${status}`)
@@ -123,7 +136,7 @@ const exec = (command, { onMessage = defaultOnMessage, onAlarm = defaultOnAlarm 
 		command.fork({
 			onMessage: text => onMessage(prefix(command, text, true)),
 			onAlarm: text => onMessage(prefix(command, text, true)),
-			onError: error => onAlarm(createAlarmFromError(error)),
+			onError: error => onAlarm(createAlarmFromError(command, error)),
 			onExit: status => {
 				if (status === 0) {
 					onMessage(createMessageFromSuccess(command, status))
@@ -156,27 +169,29 @@ or pass if all pass
 */
 const execAll = (commands, { onMessage = defaultOnMessage, onAlarm = defaultOnAlarm } = {}) =>
 	new Promise((resolve, reject) => {
-		const handleError = (error, command) => onAlarm(createAlarmFromError(error, command))
+		const handleError = (error, command) => onAlarm(createAlarmFromError(command, error))
 
 		const executions = []
 		const killOthers = (command, index) => {
-			onMessage("sending SIGTERM to other processes..")
-			executions.forEach(({ kill }, executionIndex) => {
-				if (executionIndex !== index) {
-					kill("SIGTERM")
-				}
-			})
+			if (executions.length > 1) {
+				onMessage("sending SIGTERM to other processes..")
+				executions.forEach(({ kill }, executionIndex) => {
+					if (executionIndex !== index) {
+						kill("SIGTERM")
+					}
+				})
+			}
 		}
 		const commandStatus = []
 		const handleExit = (status, command, index) => {
 			commandStatus[index] = status
 			if (status === 0) {
-				onMessage(createMessageFromSuccess(status, command, index))
+				onMessage(createMessageFromSuccess(command, status))
 				if (commandStatus.length === commands.length) {
 					resolve()
 				}
 			} else {
-				onAlarm(createAlarmFromFailure(status, command, index))
+				onAlarm(createAlarmFromFailure(command, status))
 				killOthers(command, index)
 				reject()
 			}
