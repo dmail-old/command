@@ -1,5 +1,32 @@
 /*
 
+quand on run une seule commande, ou qu'elle sont run en série
+pas besoin de préfixer, une seule command on aurait
+
+git clone git://suff.git
+cloning into...
+exited with 0
+
+commande en serie
+mkdir dir
+exited with 0
+
+cd dir
+exited with 0
+
+commande en parallèle par contre le top serait qu'on ait des logs genre (avec des labels par défaut)
+mais pas abbreviate de la commance c'est trop unreliable
+à la place on aurait a, b, c avec une couleur (si on a moins de 6 commands, sinon couleur désactiver parce
+que ça deviendrais chaud de suivre)&
+et label par défaut
+
+a: mkdir foo
+b: mkdir bar
+c: mkdir hello
+c: exited with 0
+a: exited with 0
+b: exited with 0
+
 // il manque plusieurs chose, tout dabord la possibilité
 // de créer une commande qui n'en soit pas vraiment une mais se comporte comme tel
 // pour "faire genre" et qu'elle puisse être utilisé pas execSequence
